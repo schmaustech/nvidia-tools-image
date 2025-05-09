@@ -47,8 +47,11 @@ chmod +x /usr/local/bin/mlxup
 # Set working dir
 cd /root
 
+# Set architecture
+ARCH=`uname -m`
+
 # Configure and install cuda-toolkit
-dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$ARCH/cuda-rhel9.repo
 dnf clean all
 dnf -y install cuda-toolkit-12-8
 
