@@ -57,15 +57,113 @@ $ cd nvidia-tools
 ~~~
 
 ~~~bash
+$ cat <<EOF > dockerfile.tools 
+# Start from UBI9 image
+FROM registry.access.redhat.com/ubi9/ubi:latest
 
+# Set work directory
+WORKDIR /root
+
+# Copy in packages not available in UBI repo
+COPY show_gids /usr/bin/show_gids
+COPY ibdev2netdev /usr/sbin/ibdev2netdev
+#RUN dnf install /root/rpms/usbutils*.rpm -y
+
+# DNF install packages either from repo or locally
+RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
+RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmacm libxcb libxcb-devel libxkbcommon libxkbcommon-x11 pciutils-devel rdma-core-devel xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm -y
+
+# Cleanup 
+RUN dnf clean all
+
+# Run container entrypoint
+COPY entrypoint.sh /root/entrypoint.sh
+RUN chmod +x /root/entrypoint.sh
+
+ENTRYPOINT ["/root/entrypoint.sh"]
 ~~~
 
 ~~~bash
+cat entrypoint.sh 
+#!/bin/bash
+# Set working dir
+cd /root
 
+# Set tool versions 
+MLNXTOOLVER=23.07-1.el9
+MFTTOOLVER=4.30.0-139
+MLXUPVER=4.30.0
+
+# Set architecture
+ARCH=`uname -m`
+
+# Pull mlnx-tools from EPEL
+wget https://dl.fedoraproject.org/pub/epel/9/Everything/$ARCH/Packages/m/mlnx-tools-$MLNXTOOLVER.noarch.rpm
+
+# Arm architecture fixup for mft-tools
+if [ "$ARCH" == "aarch64" ]; then export ARCH="arm64"; fi
+
+# Pull mft-tools
+wget https://www.mellanox.com/downloads/MFT/mft-$MFTTOOLVER-$ARCH-rpm.tgz
+
+# Install mlnx-tools into container
+dnf install mlnx-tools-$MLNXTOOLVER.noarch.rpm -y
+
+# Install kernel-devel package supplied in container
+rpm -ivh /root/rpms/kernel-*.rpm --nodeps
+mkdir /lib/modules/$(uname -r)/
+ln -s /usr/src/kernels/$(uname -r) /lib/modules/$(uname -r)/build
+
+# Install mft-tools into container
+tar -xzf mft-$MFTTOOLVER-$ARCH-rpm.tgz 
+cd /root/mft-$MFTTOOLVER-$ARCH-rpm
+#./install.sh --without-kernel
+./install.sh 
+
+# Change back to root workdir
+cd /root
+
+# x86 fixup for mlxup binary
+if [ "$ARCH" == "x86_64" ]; then export ARCH="x64"; fi
+
+# Pull and place mlxup binary
+wget https://www.mellanox.com/downloads/firmware/mlxup/$MLXUPVER/SFX/linux_$ARCH/mlxup
+mv mlxup /usr/local/bin
+chmod +x /usr/local/bin/mlxup
+
+# Set working dir
+cd /root
+
+# Set architecture
+ARCH=`uname -m`
+
+# Configure and install cuda-toolkit
+dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$ARCH/cuda-rhel9.repo
+dnf clean all
+dnf -y install cuda-toolkit-12-8
+
+# Export CUDA library paths
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+export LIBRARY_PATH=/usr/local/cuda/lib64:$LIBRARY_PATH
+
+# Git clone perftest repository
+git clone https://github.com/linux-rdma/perftest.git
+
+# Change into perftest directory
+cd /root/perftest
+
+# Build perftest with the cuda libraries included
+./autogen.sh
+./configure CUDA_H_PATH=/usr/local/cuda/include/cuda.h
+make -j
+make install
+
+# Sleep container indefinitly
+sleep infinity & wait
 ~~~
 
 ~~~bash
-podman build . -f dockerfile.tools -t quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
+$ podman build . -f dockerfile.tools -t quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
 STEP 1/10: FROM registry.access.redhat.com/ubi9/ubi:latest
 STEP 2/10: WORKDIR /root
 --> Using cache 05ab94448a150a327f9d8b573e4f84dea1b92343b04625732ff95d2245d883d3
