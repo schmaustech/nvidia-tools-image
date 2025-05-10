@@ -45,7 +45,7 @@ The collection contains a set of bandwidth and latency benchmark such as:
 - [Prerequisites](#prerequisites)
 - [Building The Container](#building-the-container)
 - [Running The Container](#running-the-container)
-- [Validate The Container](#validate-the-container)
+- [What The Container Can Do](#what-the-container-can-do)
 
 ## Building The Container
 
@@ -196,3 +196,287 @@ COMMIT quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
 Successfully tagged quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
 25013c77ed2a16b2741c596a3ef7a6c47f9a84752b513d0a3a5d51bfb5f79ca7
 ~~~
+
+## Running The Container
+
+The container will need to run priviledged so we can access the hardware devices.  To do this we will create a `ServiceAccount` and `Namespace` for it to run in.
+
+~~~bash
+$ cat <<EOF > nvidiatools-project.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidiatools
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nvidiatools
+  namespace: nvidiatools
+EOF
+~~~
+
+Once the resource file is generated create it on the cluster.
+
+~~~bash
+$ oc create -f nvidiatools-project.yaml 
+namespace/nvidiatools created
+serviceaccount/nvidiatoolscreated
+~~~
+
+Now that the project has been created assign the appropriate privileges to the service account.
+
+~~~bash
+$ oc -n nvidiatools adm policy add-scc-to-user privileged -z mfttool
+clusterrole.rbac.authorization.k8s.io/system:openshift:scc:privileged added: "nvidiatools"
+~~~
+
+Depending on what we want to do with the NVIDIA tools we might create one or two pods, the latter for doing RDMA testing between nodes.  I normally put a nodeSelector into the pod yaml to make sure it will run on the node where I want it to run.  This could probably be done with anti-affinity rules but this is just a nice quick way to get things moving.  The example below also shows the volume requests and mount in the use case of testing GPU Direct Storage over NFS.
+
+~~~bash
+$ cat <<EOF > nvidiatools-pod-nvd-srv-30.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rdma-eth-30-workload
+  namespace: default
+  annotations:
+    # JSON list is the canonical form; adjust if your NAD lives in another namespace
+    k8s.v1.cni.cncf.io/networks: '[{ "name": "sriov-network" }]'
+spec:
+  serviceAccountName: nvidiatools
+  nodeSelector:
+    kubernetes.io/hostname: nvd-srv-30.nvidia.eng.rdu2.dc.redhat.com
+  volumes:
+    - name: rdma-pv-storage
+      persistentVolumeClaim:
+        claimName: pvc-netapp-phy-test
+  containers:
+    - name: rdma-30-workload
+      image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+        capabilities:
+          add: ["IPC_LOCK"]
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+          openshift.io/sriovlegacy: 1
+        requests:
+          nvidia.com/gpu: 1
+          openshift.io/sriovlegacy: 1
+      volumeMounts:
+        - name: rdma-pv-storage
+          mountPath: /mnt
+EOF
+~~~
+
+Once the custom resource file has been generated, create the resource on the cluster.
+
+~~~bash
+oc create -f mfttool-pod-nvd-srv-29.yaml
+pod/mfttool-pod-nvd-srv-29 created
+~~~
+
+Validate that the pod is up and running.
+
+~~~bash
+$ oc get pods -n mfttool
+NAME                     READY   STATUS    RESTARTS   AGE
+mfttool-pod-nvd-srv-29   1/1     Running   0          28s
+~~~
+
+Next we can rsh into the pod.
+
+~~~bash
+$ oc rsh -n mfttool mfttool-pod-nvd-srv-29 
+sh-5.1#
+~~~
+
+## What The Container Can Do
+
+Once inside the pod we can run an `mst start` and then an `mst status` to see the devices.
+
+~~~bash
+
+sh-5.1# mst status
+MST modules:
+------------
+    MST PCI module is not loaded
+    MST PCI configuration module loaded
+
+MST devices:
+------------
+/dev/mst/mt4129_pciconf0         - PCI configuration cycles access.
+                                   domain:bus:dev.fn=0000:0d:00.0 addr.reg=88 data.reg=92 cr_bar.gw_offset=-1
+                                   Chip revision is: 00
+/dev/mst/mt4129_pciconf1         - PCI configuration cycles access.
+                                   domain:bus:dev.fn=0000:37:00.0 addr.reg=88 data.reg=92 cr_bar.gw_offset=-1
+                                   Chip revision is: 00
+
+sh-5.1#
+~~~
+
+One of the things we can do with this container is query the devices and their settings with `mlxconfig`.  We can also change those settings like when we need to change a port from ethernet mode to infiniband mode.
+
+~~~bash
+mlxconfig -d /dev/mst/mt4129_pciconf0 query
+
+Device #1:
+----------
+
+Device type:        ConnectX7           
+Name:               MCX715105AS-WEAT_Ax 
+Description:        NVIDIA ConnectX-7 HHHL Adapter Card; 400GbE (default mode) / NDR IB; Single-port QSFP112; Port Split Capable; PCIe 5.0 x16 with x16 PCIe extension option; Crypto Disabled; Secure Boot Enabled
+Device:             /dev/mst/mt4129_pciconf0
+
+Configurations:                                          Next Boot
+        MODULE_SPLIT_M0                             Array[0..15]        
+        MEMIC_BAR_SIZE                              0                   
+        MEMIC_SIZE_LIMIT                            _256KB(1)           
+       (...)
+        ADVANCED_PCI_SETTINGS                       False(0)            
+        SAFE_MODE_THRESHOLD                         10                  
+        SAFE_MODE_ENABLE                            True(1)
+~~~
+
+Another tool in the container is `flint` which allows us to see the firmware, product version and PSID for the device.  This is useful for preparing for a firmware update.
+
+~~~bash
+flint -d /dev/mst/mt4129_pciconf0 query
+Image type:            FS4
+FW Version:            28.42.1000
+FW Release Date:       8.8.2024
+Product Version:       28.42.1000
+Rom Info:              type=UEFI version=14.35.15 cpu=AMD64,AARCH64
+                       type=PXE version=3.7.500 cpu=AMD64
+Description:           UID                GuidsNumber
+Base GUID:             e09d730300126474        16
+Base MAC:              e09d73126474            16
+Image VSD:             N/A
+Device VSD:            N/A
+PSID:                  MT_0000001244
+Security Attributes:   secure-fw
+~~~
+
+Another tool in the container is `mlxup` which is an automated way to update the firmware.  When we run `mlxup` it queries all devices on the system and reports back the current firmware and what available firmware there is for the device.  We can then decide to update the cards or skip for now.  In the example below I have two single port CX-7 cards in the node my pod is running on and I will upgrade their firmware.
+
+~~~bash
+$ mlxup
+Querying Mellanox devices firmware ...
+
+Device #1:
+----------
+
+  Device Type:      ConnectX7
+  Part Number:      MCX715105AS-WEAT_Ax
+  Description:      NVIDIA ConnectX-7 HHHL Adapter Card; 400GbE (default mode) / NDR IB; Single-port QSFP112; Port Split Capable; PCIe 5.0 x16 with x16 PCIe extension option; Crypto Disabled; Secure Boot Enabled
+  PSID:             MT_0000001244
+  PCI Device Name:  /dev/mst/mt4129_pciconf1
+  Base MAC:         e09d73125fc4
+  Versions:         Current        Available     
+     FW             28.42.1000     28.43.1014    
+     PXE            3.7.0500       N/A           
+     UEFI           14.35.0015     N/A           
+
+  Status:           Update required
+
+Device #2:
+----------
+
+  Device Type:      ConnectX7
+  Part Number:      MCX715105AS-WEAT_Ax
+  Description:      NVIDIA ConnectX-7 HHHL Adapter Card; 400GbE (default mode) / NDR IB; Single-port QSFP112; Port Split Capable; PCIe 5.0 x16 with x16 PCIe extension option; Crypto Disabled; Secure Boot Enabled
+  PSID:             MT_0000001244
+  PCI Device Name:  /dev/mst/mt4129_pciconf0
+  Base MAC:         e09d73126474
+  Versions:         Current        Available     
+     FW             28.42.1000     28.43.1014    
+     PXE            3.7.0500       N/A           
+     UEFI           14.35.0015     N/A           
+
+  Status:           Update required
+
+---------
+Found 2 device(s) requiring firmware update...
+
+Perform FW update? [y/N]: y
+Device #1: Updating FW ...     
+FSMST_INITIALIZE -   OK          
+Writing Boot image component -   OK          
+Done
+Device #2: Updating FW ...     
+FSMST_INITIALIZE -   OK          
+Writing Boot image component -   OK          
+Done
+
+Restart needed for updates to take effect.
+Log File: /tmp/mlxup_workdir/mlxup-20250109_190606_17886.log
+~~~
+
+Notice the firmware upgrade completed but we need to restart the cards for the changes to take effect.  We can use the `mlxfwreset` command to do this and then validate with the `flint` command that the card is running the new firmware.
+
+~~~bash
+sh-5.1# mlxfwreset -d /dev/mst/mt4129_pciconf0 reset -y
+
+The reset level for device, /dev/mst/mt4129_pciconf0 is:
+
+3: Driver restart and PCI reset
+Continue with reset?[y/N] y
+-I- Sending Reset Command To Fw             -Done
+-I- Stopping Driver                         -Done
+-I- Resetting PCI                           -Done
+-I- Starting Driver                         -Done
+-I- Restarting MST                          -Done
+-I- FW was loaded successfully.
+
+sh-5.1# flint -d /dev/mst/mt4129_pciconf0 query
+Image type:            FS4
+FW Version:            28.43.1014
+FW Release Date:       7.11.2024
+Product Version:       28.43.1014
+Rom Info:              type=UEFI version=14.36.16 cpu=AMD64,AARCH64
+                       type=PXE version=3.7.500 cpu=AMD64
+Description:           UID                GuidsNumber
+Base GUID:             e09d730300126474        16
+Base MAC:              e09d73126474            16
+Image VSD:             N/A
+Device VSD:            N/A
+PSID:                  MT_0000001244
+Security Attributes:   secure-fw
+~~~
+
+We can repeat the same steps on the second card in the system to complete the firmware update. 
+
+~~~bash
+sh-5.1# mlxfwreset -d /dev/mst/mt4129_pciconf1 reset -y
+
+The reset level for device, /dev/mst/mt4129_pciconf1 is:
+
+3: Driver restart and PCI reset
+Continue with reset?[y/N] y
+-I- Sending Reset Command To Fw             -Done
+-I- Stopping Driver                         -Done
+-I- Resetting PCI                           -Done
+-I- Starting Driver                         -Done
+-I- Restarting MST                          -Done
+-I- FW was loaded successfully.
+
+sh-5.1# flint -d /dev/mst/mt4129_pciconf1 query
+Image type:            FS4
+FW Version:            28.43.1014
+FW Release Date:       7.11.2024
+Product Version:       28.43.1014
+Rom Info:              type=UEFI version=14.36.16 cpu=AMD64,AARCH64
+                       type=PXE version=3.7.500 cpu=AMD64
+Description:           UID                GuidsNumber
+Base GUID:             e09d730300125fc4        16
+Base MAC:              e09d73125fc4            16
+Image VSD:             N/A
+Device VSD:            N/A
+PSID:                  MT_0000001244
+Security Attributes:   secure-fw
+~~~
+
+Once the firmware update has been completed and validate we can remove the container.
