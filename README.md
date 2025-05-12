@@ -117,8 +117,7 @@ ln -s /usr/src/kernels/$(uname -r) /lib/modules/$(uname -r)/build
 # Install mft-tools into container
 tar -xzf mft-$MFTTOOLVER-$ARCH-rpm.tgz 
 cd /root/mft-$MFTTOOLVER-$ARCH-rpm
-#./install.sh --without-kernel
-./install.sh 
+./install.sh --without-kernel
 
 # Change back to root workdir
 cd /root
@@ -202,12 +201,7 @@ Successfully tagged quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
 The container will need to run priviledged so we can access the hardware devices.  To do this we will create a `ServiceAccount` and `Namespace` for it to run in.
 
 ~~~bash
-$ cat <<EOF > nvidiatools-project.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: nvidiatools
----
+$ cat <<EOF > nvidiatools-serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -219,15 +213,14 @@ EOF
 Once the resource file is generated create it on the cluster.
 
 ~~~bash
-$ oc create -f nvidiatools-project.yaml 
-namespace/nvidiatools created
-serviceaccount/nvidiatoolscreated
+$ oc create -f nvidiatools-serviceaccount.yaml
+serviceaccount/nvidiatools created
 ~~~
 
 Now that the project has been created assign the appropriate privileges to the service account.
 
 ~~~bash
-$ oc -n nvidiatools adm policy add-scc-to-user privileged -z mfttool
+$ oc -n default adm policy add-scc-to-user privileged -z nvidiatools
 clusterrole.rbac.authorization.k8s.io/system:openshift:scc:privileged added: "nvidiatools"
 ~~~
 
@@ -238,7 +231,7 @@ $ cat <<EOF > nvidiatools-pod-nvd-srv-30.yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: rdma-eth-30-workload
+  name: nvidiatools-30-workload
   namespace: default
   annotations:
     # JSON list is the canonical form; adjust if your NAD lives in another namespace
@@ -252,7 +245,7 @@ spec:
       persistentVolumeClaim:
         claimName: pvc-netapp-phy-test
   containers:
-    - name: rdma-30-workload
+    - name: nvidiatools-30-workload
       image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
       imagePullPolicy: IfNotPresent
       securityContext:
@@ -275,22 +268,22 @@ EOF
 Once the custom resource file has been generated, create the resource on the cluster.
 
 ~~~bash
-oc create -f mfttool-pod-nvd-srv-29.yaml
-pod/mfttool-pod-nvd-srv-29 created
+$ oc create -f nvidiatools-pod-nvd-srv-30.yaml
+pod/nvidiatools-30-workload created
 ~~~
 
 Validate that the pod is up and running.
 
 ~~~bash
-$ oc get pods -n mfttool
-NAME                     READY   STATUS    RESTARTS   AGE
-mfttool-pod-nvd-srv-29   1/1     Running   0          28s
+$ oc get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+nvidiatools-30-workload   1/1     Running   0          55s
 ~~~
 
 Next we can rsh into the pod.
 
 ~~~bash
-$ oc rsh -n mfttool mfttool-pod-nvd-srv-29 
+$ oc rsh nvidiatools-30-workload
 sh-5.1#
 ~~~
 
