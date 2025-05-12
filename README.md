@@ -45,7 +45,9 @@ The collection contains a set of bandwidth and latency benchmark such as:
 - [Prerequisites](#prerequisites)
 - [Building The Container](#building-the-container)
 - [Running The Container](#running-the-container)
-- [What The Container Can Do](#what-the-container-can-do)
+- [MLX Tool Examples](#mlx-tool-examples)
+- [Perftest Tool Examples(#perftest-tool-examples)
+- [GPU Direct Storage Examples](#gpu-direct-storage-examples)
 
 ## Building The Container
 
@@ -55,6 +57,8 @@ The first step is to make a nvidia-tools directory.
 $ mkdir -p ~/nvidia-tools
 $ cd nvidia-tools
 ~~~
+
+Next we need to create the following dockerfile we will use to build the container.
 
 ~~~bash
 $ cat <<EOF > dockerfile.tools 
@@ -76,12 +80,18 @@ RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmac
 # Cleanup 
 RUN dnf clean all
 
+# Create NFS Test Mountpoints
+RUN mkdir /nfsslow
+RUN mkdir /nfsfast
+
 # Run container entrypoint
 COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh
 
 ENTRYPOINT ["/root/entrypoint.sh"]
 ~~~
+
+One of the scripts that will get copied into the container when the dockerfile is run is the `entrypoint.sh` script.
 
 ~~~bash
 cat entrypoint.sh 
@@ -161,60 +171,69 @@ make install
 sleep infinity & wait
 ~~~
 
-~~~bash
-$ podman build . -f dockerfile.tools -t quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.2
-STEP 1/10: FROM registry.access.redhat.com/ubi9/ubi:latest
-STEP 2/10: WORKDIR /root
---> Using cache 05ab94448a150a327f9d8b573e4f84dea1b92343b04625732ff95d2245d883d3
---> 05ab94448a15
-STEP 3/10: COPY show_gids /usr/bin/show_gids
---> Using cache c311a8020674b1b165b5695be0ce32ded986b4b741b5d52bbf575aab050ea04a
---> c311a8020674
-STEP 4/10: COPY ibdev2netdev /usr/sbin/ibdev2netdev
---> Using cache df91b2f89cad5c498646cc609d3762a19069217026f370fa72f5d56e5d28142c
---> df91b2f89cad
-STEP 5/10: RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
---> Using cache c2e169180778bf7b17bf168e587f51a45206b6b16c921425a695c920953daea6
---> c2e169180778
-STEP 6/10: RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmacm libxcb libxcb-devel libxkbcommon libxkbcommon-x11 pciutils-devel rdma-core-devel xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm -y
---> Using cache 42c1747917d6b0f1fcee46b787abd35b03c88c41d59c52c3d85207c138406db9
---> 42c1747917d6
-STEP 7/10: RUN dnf clean all
---> Using cache 4010d3345bd58dc01d62bf514676b8e3b59b30ff317398f47e050eb9658e71dc
---> 4010d3345bd5
-STEP 8/10: COPY entrypoint.sh /root/entrypoint.sh
---> Using cache 31fe23b60402b637579ff3dc5bc919947a2f0e96b5d504f96cb872fc21d6b7e1
---> 31fe23b60402
-STEP 9/10: RUN chmod +x /root/entrypoint.sh
---> Using cache 2cf01c7cf3708db4889258e21eee1dd94ebdfe2256ceb56b064a914b6fd496be
---> 2cf01c7cf370
-STEP 10/10: ENTRYPOINT ["/root/entrypoint.sh"]
---> Using cache 25013c77ed2a16b2741c596a3ef7a6c47f9a84752b513d0a3a5d51bfb5f79ca7
-COMMIT quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.1
---> 25013c77ed2a
-Successfully tagged quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.2
-25013c77ed2a16b2741c596a3ef7a6c47f9a84752b513d0a3a5d51bfb5f79ca7
-~~~
+Now that we have our dockerfile and entrypoint script we can build the image.
 
 ~~~bash
-$ podman push quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.2
+$ podman build . -f dockerfile.tools -t quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
+STEP 1/12: FROM registry.access.redhat.com/ubi9/ubi:latest
+STEP 2/12: WORKDIR /root
+--> Using cache 05ab94448a150a327f9d8b573e4f84dea1b92343b04625732ff95d2245d883d3
+--> 05ab94448a15
+STEP 3/12: COPY show_gids /usr/bin/show_gids
+--> Using cache c311a8020674b1b165b5695be0ce32ded986b4b741b5d52bbf575aab050ea04a
+--> c311a8020674
+STEP 4/12: COPY ibdev2netdev /usr/sbin/ibdev2netdev
+--> Using cache df91b2f89cad5c498646cc609d3762a19069217026f370fa72f5d56e5d28142c
+--> df91b2f89cad
+STEP 5/12: RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
+--> Using cache c2e169180778bf7b17bf168e587f51a45206b6b16c921425a695c920953daea6
+--> c2e169180778
+STEP 6/12: RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmacm libxcb libxcb-devel libxkbcommon libxkbcommon-x11 pciutils-devel rdma-core-devel xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm -y
+--> Using cache 42c1747917d6b0f1fcee46b787abd35b03c88c41d59c52c3d85207c138406db9
+--> 42c1747917d6
+STEP 7/12: RUN dnf clean all
+--> Using cache 4010d3345bd58dc01d62bf514676b8e3b59b30ff317398f47e050eb9658e71dc
+--> 4010d3345bd5
+STEP 8/12: RUN mkdir /nfsslow
+--> 0711aedf2cf7
+STEP 9/12: RUN mkdir /nfsfast
+--> 13378a7cd7a3
+STEP 10/12: COPY entrypoint.sh /root/entrypoint.sh
+--> 31f3441d36fd
+STEP 11/12: RUN chmod +x /root/entrypoint.sh
+--> e7efca8322f1
+STEP 12/12: ENTRYPOINT ["/root/entrypoint.sh"]
+COMMIT quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
+--> d4a5472faadd
+Successfully tagged quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
+d4a5472faadd6f4311046595003e46fa69fb557e279440eee5211d97f62ba008
+~~~
+
+Once the image is built we can push it up to a registry that is reachable by our OpenShift cluster.
+
+~~~bash
+$ podman push quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
 Getting image source signatures
-Copying blob ec465ce79861 skipped: already exists  
-Copying blob facf1e7dd3e0 skipped: already exists  
-Copying blob 2572fa3e0870 skipped: already exists  
-Copying blob 60635972945b skipped: already exists  
 Copying blob 8dd3689de7d8 skipped: already exists  
-Copying blob c8425ec4e45f skipped: already exists  
 Copying blob 47dbbf6d4685 skipped: already exists  
-Copying blob 2c3923fff8dc skipped: already exists  
-Copying blob 0bf61ec09731 skipped: already exists  
-Copying config f00c996a5c done   | 
+Copying blob ec465ce79861 skipped: already exists  
+Copying blob 60635972945b skipped: already exists  
+Copying blob d5bc7bff5158 done   | 
+Copying blob e6e28a0d95ab done   | 
+Copying blob c8425ec4e45f skipped: already exists  
+Copying blob 2572fa3e0870 skipped: already exists  
+Copying blob 3898c9c6bd82 done   | 
+Copying blob facf1e7dd3e0 skipped: already exists  
+Copying blob c0481e3b8604 done   | 
+Copying config d4a5472faa done   | 
 Writing manifest to image destination
 ~~~
 
+If everythingt looks good we can proceed to the next section.
+
 ## Running The Container
 
-The container will need to run priviledged so we can access the hardware devices.  To do this we will create a `ServiceAccount` and `Namespace` for it to run in.
+The container will need to run priviledged so we can access the hardware devices.  To do this we will create a `ServiceAccount` for it to run.
 
 ~~~bash
 $ cat <<EOF > nvidiatools-serviceaccount.yaml
@@ -262,7 +281,7 @@ spec:
         claimName: pvc-netapp-phy-test
   containers:
     - name: nvidiatools-30-workload
-      image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.2
+      image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
       imagePullPolicy: IfNotPresent
       securityContext:
         privileged: true
@@ -305,7 +324,7 @@ sh-5.1#
 
 ## MLX Tool Examples
 
-Once inside the pod we can run an `mst start` and then an `mst status` to see the devices.
+Inside the container we can work with a variety of the MLX tooling that is available.   One thing we can see are the interfaces for the Mellanox/NVIDIA network devices by issuing a `mlx status -v`.  The net-net1 signifies that the interface is actually the one associated to this container.
 
 ~~~bash
 sh-5.1# mst status -v
@@ -335,7 +354,7 @@ ConnectX7(rev:0)        NA       0d:00.0   mlx5_0                               
 NA                      NA       37:00.6   mlx5_7                                                  0 
 ~~~
 
-One of the things we can do with this container is query the devices and their settings with `mlxconfig`.  We can also change those settings like when we need to change a port from ethernet mode to infiniband mode.
+One of the things we can do with this container is query the devices and their settings with `mlxconfig`.  We can also change those settings like when we need to change a port from ethernet mode to infiniband mode.  The example below used `egrep` to basically filter only the items we really want to see which in this case were SRIOV related.
 
 ~~~bash
 mlxconfig -d 37:00.0 query | egrep 'Device type:|Name:|Description:|Configurations:|SRIOV_EN|LINK_TYPE|NUM_OF_VFS'
@@ -486,9 +505,11 @@ PSID:                  MT_0000001244
 Security Attributes:   secure-fw
 ~~~
 
+There are a bunch of other MLX tools built into the image so explore away.   However when ready we can proceed to looking at the Perftest tooling in the next section.
+
 ## Perftest Tool Examples
 
-Next we can deploy the containers.
+For the use of perftools we really need to deploy two pods that are on different worker nodes.   We can use the same pod yaml above but just set the nodeSelector appropriately and create the pods.
 
 ~~~bash
 $ oc create -f nvidiatools-30-workload.yaml 
@@ -794,3 +815,5 @@ destroying current CUDA Ctx
 ~~~
 
 ## GPU Direct Storage Examples
+
+Finally there are the GPU Direct Storage tools that come with the container as well.  
