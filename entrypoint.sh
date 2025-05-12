@@ -30,8 +30,7 @@ ln -s /usr/src/kernels/$(uname -r) /lib/modules/$(uname -r)/build
 # Install mft-tools into container
 tar -xzf mft-$MFTTOOLVER-$ARCH-rpm.tgz 
 cd /root/mft-$MFTTOOLVER-$ARCH-rpm
-#./install.sh --without-kernel
-./install.sh 
+./install.sh --without-kernel
 
 # Change back to root workdir
 cd /root
