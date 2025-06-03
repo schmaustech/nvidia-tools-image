@@ -46,7 +46,7 @@ The collection contains a set of bandwidth and latency benchmark such as:
 - [Building The Container](#building-the-container)
 - [Running The Container](#running-the-container)
 - [MLX Tool Examples](#mlx-tool-examples)
-- [Perftest Tool Examples(#perftest-tool-examples)
+- [Perftest Tool Examples](#perftest-tool-examples)
 - [GPU Direct Storage Examples](#gpu-direct-storage-examples)
 
 ## Building The Container
