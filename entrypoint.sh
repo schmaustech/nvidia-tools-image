@@ -46,6 +46,7 @@ chmod +x /usr/local/bin/mlxup
 # Set working dir
 cd /root
 
+
 # Set architecture
 ARCH=`uname -m`
 
@@ -53,6 +54,7 @@ ARCH=`uname -m`
 dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$ARCH/cuda-rhel9.repo
 dnf clean all
 dnf -y install cuda-toolkit-12-8
+dnf -y install libnccl-static libnccl-devel libnccl
 
 # Export CUDA library paths
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
@@ -69,6 +71,21 @@ cd /root/perftest
 ./configure CUDA_H_PATH=/usr/local/cuda/include/cuda.h
 make -j
 make install
+
+# Return to root
+cd /root
+
+# Git clone nccl-tests repository
+git clone https://github.com/NVIDIA/nccl-tests.git
+
+# Change into nccl-tests
+cd /root/nccl-tests
+
+# Build nccl-tests
+make MPI=1 MPI_HOME=/usr/lib64/openmpi
+
+# Enable SSHD deamon on port 20024
+mkdir -p /var/run/sshd && /usr/sbin/sshd -p 20024
 
 # Sleep container indefinitly
 sleep infinity & wait
