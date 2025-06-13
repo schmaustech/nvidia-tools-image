@@ -46,7 +46,6 @@ chmod +x /usr/local/bin/mlxup
 # Set working dir
 cd /root
 
-
 # Set architecture
 ARCH=`uname -m`
 
@@ -83,6 +82,15 @@ cd /root/nccl-tests
 
 # Build nccl-tests
 make MPI=1 MPI_HOME=/usr/lib64/openmpi
+
+# Enable RDMA Sharp Plugins
+cd /root
+git clone https://github.com/Mellanox/nccl-rdma-sharp-plugins.git
+cd nccl-rdma-sharp-plugins/
+./autogen.sh
+./configure --with-cuda=/usr/local/cuda-12.8/
+make
+make install
 
 # Enable SSHD deamon on port 20024
 mkdir -p /var/run/sshd && /usr/sbin/sshd -p 20024
