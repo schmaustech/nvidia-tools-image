@@ -48,6 +48,7 @@ The collection contains a set of bandwidth and latency benchmark such as:
 - [MLX Tool Examples](#mlx-tool-examples)
 - [Perftest Tool Examples](#perftest-tool-examples)
 - [GPU Direct Storage Examples](#gpu-direct-storage-examples)
+- [NCCL Test Example](#nccl-test-example)
 
 ## Building The Container
 
@@ -816,4 +817,257 @@ destroying current CUDA Ctx
 
 ## GPU Direct Storage Examples
 
-Finally there are the GPU Direct Storage tools that come with the container as well.  
+Finally there are the GPU Direct Storage tools that come with the container as well.  The following pod yaml defines this configuration.  This assumes the OpenShift cluster has been configured appropriately for the use of GPU Direct Storage for Netapp which is documented [here](https://github.com/schmaustech/ocp-gds-netapp)
+
+~~~bash
+$ cat <<EOF > nvidiatools-30-workload.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nvidiatools-30-workload
+  namespace: default
+  annotations:
+    # JSON list is the canonical form; adjust if your NAD lives in another namespace
+    k8s.v1.cni.cncf.io/networks: '[{ "name": "sriov-network" }]'
+spec:
+  serviceAccountName: nvidiatools
+  nodeSelector:
+    kubernetes.io/hostname: nvd-srv-30.nvidia.eng.rdu2.dc.redhat.com
+  volumes:
+    - name: rdma-pv-storage
+      persistentVolumeClaim:
+        claimName: pvc-netapp-phy-test
+    - name: nordma-pv-storage
+      persistentVolumeClaim:
+        claimName: pvc-netapp-phy-nordma-test
+  containers:
+    - name: nvidiatools-30-workload
+      image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+        capabilities:
+          add: ["IPC_LOCK"]
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+          openshift.io/sriovlegacy: 1
+        requests:
+          nvidia.com/gpu: 1
+          openshift.io/sriovlegacy: 1
+      volumeMounts:
+        - name: rdma-pv-storage
+          mountPath: /nfsfast
+        - name: nordma-pv-storage
+          mountPath: /nfsslow
+EOF
+~~~
+
+~~~bash
+$ oc create -f nvidiatools-30-workload.yaml 
+nvidiatools-30-workload created
+
+$ oc get pods
+NAME                 READY   STATUS    RESTARTS   AGE
+nvidiatools-30-workload   1/1     Running   0          3s
+~~~
+
+Once the pod is up and running we can `rsh` into the pod and run the `gdscheck` tool to confirm capabilities and configuration of GPU Direct Storage.
+
+~~~bash
+$ oc rsh nvidiatools-30-workload
+        
+sh-5.1# /usr/local/cuda/gds/tools/gdscheck -p
+ GDS release version: 1.13.1.3
+ nvidia_fs version:  2.20 libcufile version: 2.12
+ Platform: x86_64
+ ============
+ ENVIRONMENT:
+ ============
+ =====================
+ DRIVER CONFIGURATION:
+ =====================
+ NVMe P2PDMA        : Unsupported
+ NVMe               : Supported
+ NVMeOF             : Supported
+ SCSI               : Unsupported
+ ScaleFlux CSD      : Unsupported
+ NVMesh             : Unsupported
+ DDN EXAScaler      : Unsupported
+ IBM Spectrum Scale : Unsupported
+ NFS                : Supported
+ BeeGFS             : Unsupported
+ WekaFS             : Unsupported
+ Userspace RDMA     : Unsupported
+ --Mellanox PeerDirect : Disabled
+ --rdma library        : Not Loaded (libcufile_rdma.so)
+ --rdma devices        : Not configured
+ --rdma_device_status  : Up: 0 Down: 0
+ =====================
+ CUFILE CONFIGURATION:
+ =====================
+ properties.use_pci_p2pdma : false
+ properties.use_compat_mode : true
+ properties.force_compat_mode : false
+ properties.gds_rdma_write_support : true
+ properties.use_poll_mode : false
+ properties.poll_mode_max_size_kb : 4
+ properties.max_batch_io_size : 128
+ properties.max_batch_io_timeout_msecs : 5
+ properties.max_direct_io_size_kb : 16384
+ properties.max_device_cache_size_kb : 131072
+ properties.max_device_pinned_mem_size_kb : 33554432
+ properties.posix_pool_slab_size_kb : 4 1024 16384 
+ properties.posix_pool_slab_count : 128 64 64 
+ properties.rdma_peer_affinity_policy : RoundRobin
+ properties.rdma_dynamic_routing : 0
+ fs.generic.posix_unaligned_writes : false
+ fs.lustre.posix_gds_min_kb: 0
+ fs.beegfs.posix_gds_min_kb: 0
+ fs.weka.rdma_write_support: false
+ fs.gpfs.gds_write_support: false
+ fs.gpfs.gds_async_support: true
+ profile.nvtx : false
+ profile.cufile_stats : 0
+ miscellaneous.api_check_aggressive : false
+ execution.max_io_threads : 4
+ execution.max_io_queue_depth : 128
+ execution.parallel_io : true
+ execution.min_io_threshold_size_kb : 8192
+ execution.max_request_parallelism : 4
+ properties.force_odirect_mode : false
+ properties.prefer_iouring : false
+ =========
+ GPU INFO:
+ =========
+ GPU index 0 NVIDIA L40S bar:1 bar size (MiB):65536 supports GDS, IOMMU State: Disabled
+ ==============
+ PLATFORM INFO:
+ ==============
+ IOMMU: disabled
+ Nvidia Driver Info Status: Supported(Nvidia Open Driver Installed)
+ Cuda Driver Version Installed:  12080
+ Platform: PowerEdge R760xa, Arch: x86_64(Linux 5.14.0-427.65.1.el9_4.x86_64)
+ Platform verification succeeded
+~~~
+
+Now let's confirm our GPU Direct NFS mount is mounted.  Notice in the output the proto is rdma.
+
+~~~bash
+sh-5.1# mount|grep nfs
+192.168.10.101:/trident_pvc_ae477c5c_cf10_4bc0_bb71_39d214a237f0 on /mnt type nfs4 (rw,relatime,vers=4.1,rsize=262144,wsize=262144,namlen=255,hard,proto=rdma,max_connect=16,port=20049,timeo=600,retrans=2,sec=sys,clientaddr=192.168.10.30,local_lock=none,write=eager,addr=192.168.10.101)
+~~~
+
+Next we can use `gdsio` to run some benchmarks across the GPU Direct NFS mount.  Before we run the benchmarks let's familiarize ourselves with the all the `gdsio` switches and what they mean.
+
+~~~bash
+sh-5.1# /usr/local/cuda-12.8/gds/tools/gdsio -h
+gdsio version :1.12
+Usage [using config file]: gdsio rw-sample.gdsio
+Usage [using cmd line options]:/usr/local/cuda-12.8/gds/tools/gdsio 
+         -f <file name>
+         -D <directory name>
+         -d <gpu_index (refer nvidia-smi)>
+         -n <numa node>
+         -m <memory type(0 - (cudaMalloc), 1 - (cuMem), 2 - (cudaMallocHost), 3 - (malloc) 4 - (mmap))>
+         -w <number of threads for a job>
+         -s <file size(K|M|G)>
+         -o <start offset(K|M|G)>
+         -i <io_size(K|M|G)> <min_size:max_size:step_size>
+         -p <enable nvlinks> 
+         -b <skip bufregister> 
+         -V <verify IO>
+         -x <xfer_type> [0(GPU_DIRECT), 1(CPU_ONLY), 2(CPU_GPU), 3(CPU_ASYNC_GPU), 4(CPU_CACHED_GPU), 5(GPU_DIRECT_ASYNC), 6(GPU_BATCH), 7(GPU_BATCH_STREAM)]
+         -B <batch size>
+         -I <(read) 0|(write)1| (randread) 2| (randwrite) 3>
+         -T <duration in seconds>
+         -k <random_seed> (number e.g. 3456) to be used with random read/write> 
+         -U <use unaligned(4K) random offsets>
+         -R <fill io buffer with random data>
+         -F <refill io buffer with random data during each write>
+         -a <alignment size in case of random IO>
+         -M <mixed_rd_wr_percentage in case of regular batch mode>
+         -P <rdma url>
+         -J <per job statistics>
+
+xfer_type:
+0 - Storage->GPU (GDS)
+1 - Storage->CPU
+2 - Storage->CPU->GPU
+3 - Storage->CPU->GPU_ASYNC
+4 - Storage->PAGE_CACHE->CPU->GPU
+5 - Storage->GPU_ASYNC
+6 - Storage->GPU_BATCH
+7 - Storage->GPU_BATCH_STREAM
+
+Note:
+read test (-I 0) with verify option (-V) should be used with files written (-I 1) with -V option
+read test (-I 2) with verify option (-V) should be used with files written (-I 3) with -V option, using same random seed (-k),
+same number of threads(-w), offset(-o), and data size(-s)
+write test (-I 1/3) with verify option (-V) will perform writes followed by read
+~~~
+
+Before we begin running some tests I want to note that the tests are being run from a standard Dell R760xa and from the `nvidia-smi` topo output we can see we are dealing with a non optimal setup of NODE where the connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node.  Ideally for peformant numbers we would want to run this on a H100 or B200 where the GPU and NIC are connected to the same PCIe switch and yield a PHB,PXB or PIX connection.
+
+~~~bash
+sh-5.1# nvidia-smi topo -mp
+	    GPU0	NIC0	NIC1	NIC2	NIC3	NIC4	NIC5	NIC6	NIC7	NIC8	NIC9	CPU Affinity	NUMA Affinity	GPU NUMA ID
+GPU0	 X 	NODE	NODE	NODE	NODE	NODE	NODE	NODE	NODE	NODE	NODE	0,2,4,6,8,10	0		N/A
+NIC0	NODE	 X 	NODE	NODE	NODE	NODE	NODE	NODE	NODE	NODE	NODE				
+NIC1	NODE	NODE	 X 	PIX	PIX	PIX	PIX	PIX	PIX	PIX	PIX				
+NIC2	NODE	NODE	PIX	 X 	PIX	PIX	PIX	PIX	PIX	PIX	PIX				
+NIC3	NODE	NODE	PIX	PIX	 X 	PIX	PIX	PIX	PIX	PIX	PIX				
+NIC4	NODE	NODE	PIX	PIX	PIX	 X 	PIX	PIX	PIX	PIX	PIX				
+NIC5	NODE	NODE	PIX	PIX	PIX	PIX	 X 	PIX	PIX	PIX	PIX				
+NIC6	NODE	NODE	PIX	PIX	PIX	PIX	PIX	 X 	PIX	PIX	PIX				
+NIC7	NODE	NODE	PIX	PIX	PIX	PIX	PIX	PIX	 X 	PIX	PIX				
+NIC8	NODE	NODE	PIX	PIX	PIX	PIX	PIX	PIX	PIX	 X 	PIX				
+NIC9	NODE	NODE	PIX	PIX	PIX	PIX	PIX	PIX	PIX	PIX	 X 				
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+
+NIC Legend:
+
+  NIC0: mlx5_0
+  NIC1: mlx5_1
+  NIC2: mlx5_2
+  NIC3: mlx5_3
+  NIC4: mlx5_4
+  NIC5: mlx5_5
+  NIC6: mlx5_6
+  NIC7: mlx5_7
+  NIC8: mlx5_8
+  NIC9: mlx5_9
+~~~
+
+Now let's run a few `gdsio` tests across our RDMA nfs mount.  In this first example, gdsio is used to generate a random write load of small IOs (4k) to one of the NFS mount point
+
+~~~bash
+sh-5.1# /usr/local/cuda-12.8/gds/tools/gdsio -D /nfsfast -d 0 -w 32 -s 500M -i 4K -x 0 -I 3 -T 120
+IoType: RANDWRITE XferType: GPUD Threads: 32 DataSetSize: 43222136/16384000(KiB) IOSize: 4(KiB) Throughput: 0.344940 GiB/sec, Avg_Latency: 352.314946 usecs ops: 10805534 total_time 119.498576 secs
+~~~
+
+Next we will repeat the same test but for random reads.
+
+~~~bash
+sh-5.1# /usr/local/cuda-12.8/gds/tools/gdsio -D /nfsfast -d 0 -w 32 -s 500M -i 4K -x 0 -I 2 -T 120
+IoType: RANDREAD XferType: GPUD Threads: 32 DataSetSize: 71313540/16384000(KiB) IOSize: 4(KiB) Throughput: 0.569229 GiB/sec, Avg_Latency: 214.448246 usecs ops: 17828385 total_time 119.477201 secs
+~~~
+
+Small and random IOs are all about IOPS and latency. For our next test we will determine throughput.  We will use larger files sizes and much larger IO sizes.
+
+~~~bash
+sh-5.1# /usr/local/cuda-12.8/gds/tools/gdsio -D /nfsfast -d 0 -w 32 -s 1G -i 1M -x 0 -I 1 -T 120
+IoType: WRITE XferType: GPUD Threads: 32 DataSetSize: 320301056/33554432(KiB) IOSize: 1024(KiB) Throughput: 2.547637 GiB/sec, Avg_Latency: 12487.658159 usecs ops: 312794 total_time 119.900455 secs
+~~~
+
+This concludes the workflow of configuring and testing GPU Direct Storage on OpenShift over an RDMA NFS mount.
+
+## NCCL Test Example
