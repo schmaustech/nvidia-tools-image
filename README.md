@@ -1071,3 +1071,89 @@ IoType: WRITE XferType: GPUD Threads: 32 DataSetSize: 320301056/33554432(KiB) IO
 This concludes the workflow of configuring and testing GPU Direct Storage on OpenShift over an RDMA NFS mount.
 
 ## NCCL Test Example
+
+The following is an example using the NCCL tests that are part of the container image.   It assumes one of the pod yamls above have been deployed on two different worker nodes in the cluster that have a secondary RDMA interface and also a GPU allocated to them.   
+
+~~~bash
+1$ oc get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+nvidiatools-29-workload   1/1     Running   0          4h58m
+nvidiatools-30-workload   1/1     Running   0          4h58m
+~~~
+
+~~~bash
+sh-5.1# ssh root@192.168.10.1 -p 20024
+The authenticity of host '[192.168.10.1]:20024 ([192.168.10.1]:20024)' can't be established.
+ED25519 key fingerprint is SHA256:O3+QFmbfo2dh8PKuGwBuTYmsXiQ776sxNoleuzPRpxg.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '[192.168.10.1]:20024' (ED25519) to the list of known hosts.
+[root@nvidiatools-29-workload ~]# exit
+logout
+Connection to 192.168.10.1 closed.
+sh-5.1# ssh root@192.168.10.2 -p 20024
+The authenticity of host '[192.168.10.2]:20024 ([192.168.10.2]:20024)' can't be established.
+ED25519 key fingerprint is SHA256:O3+QFmbfo2dh8PKuGwBuTYmsXiQ776sxNoleuzPRpxg.
+This host key is known by the following other names/addresses:
+    ~/.ssh/known_hosts:1: [192.168.10.1]:20024
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '[192.168.10.2]:20024' (ED25519) to the list of known hosts.
+[root@nvidiatools-30-workload ~]# exit
+logout
+Connection to 192.168.10.2 closed.
+~~~
+
+~~~bash
+sh-5.1# source ./.bashrc
+[root@nvidiatools-29-workload ~]# cd nccl-tests/
+~~~
+
+~~~bash
+[root@nvidiatools-29-workload nccl-tests]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_1,mlx5_5 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 ./build/all_reduce_perf -b 8 -e 16G -f2 -g 1
+# nThread 1 nGpus 1 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid  14632 on nvidiatools-29-workload device  0 [0000:61:00] NVIDIA L40S
+#  Rank  1 Group  0 Pid  13776 on nvidiatools-30-workload device  0 [0000:61:00] NVIDIA L40S
+#
+# Reducing maxBytes to 15534478677 due to memory limitation
+NCCL version 2.27.3+cuda12.9
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)       
+           8             2     float     sum      -1    13.16    0.00    0.00      0    12.71    0.00    0.00      0
+          16             4     float     sum      -1    12.44    0.00    0.00      0    12.55    0.00    0.00      0
+          32             8     float     sum      -1    12.58    0.00    0.00      0    12.91    0.00    0.00      0
+          64            16     float     sum      -1    12.56    0.01    0.01      0    12.61    0.01    0.01      0
+         128            32     float     sum      -1    12.85    0.01    0.01      0    12.63    0.01    0.01      0
+         256            64     float     sum      -1    12.75    0.02    0.02      0    12.67    0.02    0.02      0
+         512           128     float     sum      -1    13.00    0.04    0.04      0    13.09    0.04    0.04      0
+        1024           256     float     sum      -1    13.24    0.08    0.08      0    13.40    0.08    0.08      0
+        2048           512     float     sum      -1    13.83    0.15    0.15      0    13.60    0.15    0.15      0
+        4096          1024     float     sum      -1    14.38    0.28    0.28      0    14.34    0.29    0.29      0
+        8192          2048     float     sum      -1    15.64    0.52    0.52      0    15.80    0.52    0.52      0
+       16384          4096     float     sum      -1    18.22    0.90    0.90      0    18.41    0.89    0.89      0
+       32768          8192     float     sum      -1    21.81    1.50    1.50      0    21.90    1.50    1.50      0
+       65536         16384     float     sum      -1    30.53    2.15    2.15      0    29.90    2.19    2.19      0
+      131072         32768     float     sum      -1    47.40    2.77    2.77      0    46.67    2.81    2.81      0
+      262144         65536     float     sum      -1    86.26    3.04    3.04      0    83.96    3.12    3.12      0
+      524288        131072     float     sum      -1    162.7    3.22    3.22      0    160.2    3.27    3.27      0
+     1048576        262144     float     sum      -1    163.7    6.41    6.41      0    164.8    6.36    6.36      0
+     2097152        524288     float     sum      -1    295.7    7.09    7.09      0    294.1    7.13    7.13      0
+     4194304       1048576     float     sum      -1    553.4    7.58    7.58      0    553.1    7.58    7.58      0
+     8388608       2097152     float     sum      -1   1069.7    7.84    7.84      0   1065.7    7.87    7.87      0
+    16777216       4194304     float     sum      -1   2126.3    7.89    7.89      0   2124.1    7.90    7.90      0
+    33554432       8388608     float     sum      -1   4241.3    7.91    7.91      0   4243.2    7.91    7.91      0
+    67108864      16777216     float     sum      -1   8467.6    7.93    7.93      0   8481.2    7.91    7.91      0
+   134217728      33554432     float     sum      -1    16939    7.92    7.92      0    16921    7.93    7.93      0
+   268435456      67108864     float     sum      -1    33830    7.93    7.93      0    33799    7.94    7.94      0
+   536870912     134217728     float     sum      -1    67353    7.97    7.97      0    67745    7.92    7.92      0
+  1073741824     268435456     float     sum      -1   135262    7.94    7.94      0   134994    7.95    7.95      0
+  2147483648     536870912     float     sum      -1   269500    7.97    7.97      0   269889    7.96    7.96      0
+  4294967296    1073741824     float     sum      -1   537003    8.00    8.00      0   539900    7.96    7.96      0
+  8589934592    2147483648     float     sum      -1  1075333    7.99    7.99      0  1078949    7.96    7.96      0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 3.97162 
+#
+~~~
