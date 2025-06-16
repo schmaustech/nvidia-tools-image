@@ -1082,18 +1082,22 @@ nvidiatools-30-workload   1/1     Running   0          4h58m
 ~~~
 
 ~~~bash
-sh-5.1# ssh root@192.168.10.1 -p 20024
+sh-5.1# source ./.bashrc
+~~~
+
+~~~bash
+[root@nvidiatools-29-workload ~]# ssh root@192.168.10.1 -p 20024
 The authenticity of host '[192.168.10.1]:20024 ([192.168.10.1]:20024)' can't be established.
-ED25519 key fingerprint is SHA256:O3+QFmbfo2dh8PKuGwBuTYmsXiQ776sxNoleuzPRpxg.
+ED25519 key fingerprint is SHA256:g9idnga9y3qyR4yZ1uoz7EC8TcBt5belh+QMVNBUO+I.
 This key is not known by any other names
 Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
 Warning: Permanently added '[192.168.10.1]:20024' (ED25519) to the list of known hosts.
 [root@nvidiatools-29-workload ~]# exit
 logout
 Connection to 192.168.10.1 closed.
-sh-5.1# ssh root@192.168.10.2 -p 20024
+[root@nvidiatools-29-workload ~]# ssh root@192.168.10.2 -p 20024
 The authenticity of host '[192.168.10.2]:20024 ([192.168.10.2]:20024)' can't be established.
-ED25519 key fingerprint is SHA256:O3+QFmbfo2dh8PKuGwBuTYmsXiQ776sxNoleuzPRpxg.
+ED25519 key fingerprint is SHA256:g9idnga9y3qyR4yZ1uoz7EC8TcBt5belh+QMVNBUO+I.
 This host key is known by the following other names/addresses:
     ~/.ssh/known_hosts:1: [192.168.10.1]:20024
 Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
@@ -1104,12 +1108,18 @@ Connection to 192.168.10.2 closed.
 ~~~
 
 ~~~bash
-sh-5.1# source ./.bashrc
-[root@nvidiatools-29-workload ~]# cd nccl-tests/
+[root@nvidiatools-30-workload ~]# show_gids
+DEV	PORT	INDEX	GID					IPv4  		VER	DEV
+---	----	-----	---					------------  	---	---
+mlx5_3	1	0	fe80:0000:0000:0000:0cb0:10ff:fe34:0aad			v1	net1
+mlx5_3	1	1	fe80:0000:0000:0000:0cb0:10ff:fe34:0aad			v2	net1
+mlx5_3	1	2	0000:0000:0000:0000:0000:ffff:c0a8:0a02	192.168.10.2  	v1	net1
+mlx5_3	1	3	0000:0000:0000:0000:0000:ffff:c0a8:0a02	192.168.10.2  	v2	net1
+n_gids_found=4
 ~~~
 
 ~~~bash
-[root@nvidiatools-29-workload nccl-tests]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_1,mlx5_5 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 ./build/all_reduce_perf -b 8 -e 16G -f2 -g 1
+[root@nvidiatools-29-workload nccl-tests]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_1,mlx5_3 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 ./build/all_reduce_perf -b 8 -e 16G -f2 -g 1
 # nThread 1 nGpus 1 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
@@ -1155,5 +1165,57 @@ NCCL version 2.27.3+cuda12.9
   8589934592    2147483648     float     sum      -1  1059765    8.11    8.11      0  1058307    8.12    8.12      0
 # Out of bounds values : 0 OK
 # Avg bus bandwidth    : 3.98762 
+#
+~~~
+
+~~~bash
+[root@nvidiatools-29-workload ~]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=0 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_2,mlx5_8 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 all_reduce_perf -b 8 -e 16G -f2 -g 2
+# nThread 1 nGpus 2 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid  11142 on nvidiatools-29-workload device  0 [0000:61:00] NVIDIA L40S
+#  Rank  1 Group  0 Pid  11142 on nvidiatools-29-workload device  1 [0000:e1:00] NVIDIA L40S
+#  Rank  2 Group  0 Pid  11317 on nvidiatools-30-workload device  0 [0000:61:00] NVIDIA L40S
+#  Rank  3 Group  0 Pid  11317 on nvidiatools-30-workload device  1 [0000:e1:00] NVIDIA L40S
+#
+# Reducing maxBytes to 15534478677 due to memory limitation
+NCCL version 2.27.3+cuda12.9
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)       
+           8             2     float     sum      -1    17.10    0.00    0.00      0    17.11    0.00    0.00      0
+          16             4     float     sum      -1    16.79    0.00    0.00      0    17.07    0.00    0.00      0
+          32             8     float     sum      -1    18.78    0.00    0.00      0    18.69    0.00    0.00      0
+          64            16     float     sum      -1    19.40    0.00    0.00      0    19.54    0.00    0.00      0
+         128            32     float     sum      -1    19.57    0.01    0.01      0    19.92    0.01    0.01      0
+         256            64     float     sum      -1    20.08    0.01    0.02      0    20.15    0.01    0.02      0
+         512           128     float     sum      -1    20.38    0.03    0.04      0    20.65    0.02    0.04      0
+        1024           256     float     sum      -1    20.75    0.05    0.07      0    20.60    0.05    0.07      0
+        2048           512     float     sum      -1    21.20    0.10    0.14      0    20.81    0.10    0.15      0
+        4096          1024     float     sum      -1    22.02    0.19    0.28      0    21.66    0.19    0.28      0
+        8192          2048     float     sum      -1    23.37    0.35    0.53      0    23.16    0.35    0.53      0
+       16384          4096     float     sum      -1    25.28    0.65    0.97      0    25.11    0.65    0.98      0
+       32768          8192     float     sum      -1    28.34    1.16    1.73      0    28.50    1.15    1.72      0
+       65536         16384     float     sum      -1    34.84    1.88    2.82      0    35.16    1.86    2.80      0
+      131072         32768     float     sum      -1    50.01    2.62    3.93      0    49.83    2.63    3.95      0
+      262144         65536     float     sum      -1    88.46    2.96    4.45      0    87.70    2.99    4.48      0
+      524288        131072     float     sum      -1    170.7    3.07    4.61      0    169.8    3.09    4.63      0
+     1048576        262144     float     sum      -1    334.5    3.13    4.70      0    333.4    3.15    4.72      0
+     2097152        524288     float     sum      -1    371.8    5.64    8.46      0    371.6    5.64    8.47      0
+     4194304       1048576     float     sum      -1    702.4    5.97    8.96      0    701.5    5.98    8.97      0
+     8388608       2097152     float     sum      -1   1350.9    6.21    9.31      0   1352.6    6.20    9.30      0
+    16777216       4194304     float     sum      -1   2622.3    6.40    9.60      0   2624.8    6.39    9.59      0
+    33554432       8388608     float     sum      -1   5250.9    6.39    9.59      0   5262.6    6.38    9.56      0
+    67108864      16777216     float     sum      -1    10496    6.39    9.59      0    10519    6.38    9.57      0
+   134217728      33554432     float     sum      -1    21010    6.39    9.58      0    20996    6.39    9.59      0
+   268435456      67108864     float     sum      -1    42017    6.39    9.58      0    42036    6.39    9.58      0
+   536870912     134217728     float     sum      -1    84016    6.39    9.59      0    83880    6.40    9.60      0
+  1073741824     268435456     float     sum      -1   167668    6.40    9.61      0   168001    6.39    9.59      0
+  2147483648     536870912     float     sum      -1   335268    6.41    9.61      0   335296    6.40    9.61      0
+  4294967296    1073741824     float     sum      -1   670576    6.40    9.61      0   670652    6.40    9.61      0
+  8589934592    2147483648     float     sum      -1  1338003    6.42    9.63      0  1340024    6.41    9.62      0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 4.74277 
 #
 ~~~
