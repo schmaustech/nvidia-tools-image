@@ -1072,40 +1072,66 @@ This concludes the workflow of configuring and testing GPU Direct Storage on Ope
 
 ## NCCL Test Example
 
-The following is an example using the NCCL tests that are part of the container image.   It assumes one of the pod yamls above have been deployed on two different worker nodes in the cluster that have a secondary RDMA interface and also a GPU allocated to them.   
+The following is an example using the NCCL tests that are part of the container image.   It assumes one of the pod yamls above have been deployed on two different worker nodes in the cluster that have a secondary RDMA interface and also a GPU allocated to them.
+
+Here is an example of the pod yaml that I used for both pods only changing the hostname.
 
 ~~~bash
-1$ oc get pods
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nvidiatools-30-workload
+  namespace: default
+  annotations:
+    # JSON list is the canonical form; adjust if your NAD lives in another namespace
+    k8s.v1.cni.cncf.io/networks: '[{ "name": "sriov-network" }]'
+spec:
+  serviceAccountName: nvidiatools
+  nodeSelector:
+    kubernetes.io/hostname: nvd-srv-30.nvidia.eng.rdu2.dc.redhat.com
+  volumes:
+    - name: shmem
+      emptyDir: {
+          medium: 'Memory',
+          sizeLimit: '16Gi'
+      }
+  containers:
+    - name: nvidiatools-30-workload
+      image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.1.1
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+        capabilities:
+          add: ["IPC_LOCK"]
+      resources:
+        limits:
+          nvidia.com/gpu: 2
+          openshift.io/sriovlegacy: 1
+        requests:
+          nvidia.com/gpu: 2
+          openshift.io/sriovlegacy: 1
+      volumeMounts:
+      volumeMounts:
+        - mountPath: /dev/shm
+          name: shmem
+~~~
+
+Let's confirm we have our pods running.  In the case below they are in the default namespace.
+
+~~~bash
+$ oc get pods
 NAME                      READY   STATUS    RESTARTS   AGE
 nvidiatools-29-workload   1/1     Running   0          4h58m
 nvidiatools-30-workload   1/1     Running   0          4h58m
 ~~~
 
+We will need to open two terminal sessions, one into each pod.   Inside we can then source the `.bashrc` which will set our pathing appropriately.
+
 ~~~bash
 sh-5.1# source ./.bashrc
 ~~~
 
-~~~bash
-[root@nvidiatools-29-workload ~]# ssh root@192.168.10.1 -p 20024
-The authenticity of host '[192.168.10.1]:20024 ([192.168.10.1]:20024)' can't be established.
-ED25519 key fingerprint is SHA256:g9idnga9y3qyR4yZ1uoz7EC8TcBt5belh+QMVNBUO+I.
-This key is not known by any other names
-Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
-Warning: Permanently added '[192.168.10.1]:20024' (ED25519) to the list of known hosts.
-[root@nvidiatools-29-workload ~]# exit
-logout
-Connection to 192.168.10.1 closed.
-[root@nvidiatools-29-workload ~]# ssh root@192.168.10.2 -p 20024
-The authenticity of host '[192.168.10.2]:20024 ([192.168.10.2]:20024)' can't be established.
-ED25519 key fingerprint is SHA256:g9idnga9y3qyR4yZ1uoz7EC8TcBt5belh+QMVNBUO+I.
-This host key is known by the following other names/addresses:
-    ~/.ssh/known_hosts:1: [192.168.10.1]:20024
-Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
-Warning: Permanently added '[192.168.10.2]:20024' (ED25519) to the list of known hosts.
-[root@nvidiatools-30-workload ~]# exit
-logout
-Connection to 192.168.10.2 closed.
-~~~
+We also need to run the `show_gids` command determine which Mellanox devices are present.  We will use this information for the next step.
 
 ~~~bash
 [root@nvidiatools-30-workload ~]# show_gids
@@ -1117,6 +1143,8 @@ mlx5_3	1	2	0000:0000:0000:0000:0000:ffff:c0a8:0a02	192.168.10.2  	v1	net1
 mlx5_3	1	3	0000:0000:0000:0000:0000:ffff:c0a8:0a02	192.168.10.2  	v2	net1
 n_gids_found=4
 ~~~
+
+Now we can actually do our mpirun across the two worker nodes.  
 
 ~~~bash
 [root@nvidiatools-29-workload nccl-tests]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_1,mlx5_3 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 ./build/all_reduce_perf -b 8 -e 16G -f2 -g 1
@@ -1167,6 +1195,8 @@ NCCL version 2.27.3+cuda12.9
 # Avg bus bandwidth    : 3.98762 
 #
 ~~~
+
+This second run is just like the first except we have allocated 2 GPUs per pods instead of just 1 as in the first test run.
 
 ~~~bash
 [root@nvidiatools-29-workload ~]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=0 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_2,mlx5_8 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 all_reduce_perf -b 8 -e 16G -f2 -g 2
