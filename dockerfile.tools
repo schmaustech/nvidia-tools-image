@@ -7,12 +7,12 @@ WORKDIR /root
 # Copy in packages not available in UBI repo
 COPY show_gids /usr/bin/show_gids
 COPY ibdev2netdev /usr/sbin/ibdev2netdev
-#RUN dnf install /root/rpms/usbutils*.rpm -y
 
 # DNF install packages either from repo or locally
 RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
 RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmacm libxcb libxcb-devel libxkbcommon libxkbcommon-x11 pciutils-devel rdma-core-devel xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm -y
 RUN dnf install openmpi openmpi-devel openssh-server openssh-clients -y
+RUN dnf install iperf3 -y
 
 # Cleanup 
 RUN dnf clean all
@@ -29,8 +29,9 @@ COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh
 COPY bashrc /root/.bashrc
 RUN ssh-keygen -A
-RUN yes y | ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa > /dev/null
+RUN yes y | ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa > /dev/null 
 RUN cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
+COPY config /root/.ssh/config
 
 ENTRYPOINT ["/root/entrypoint.sh"]
