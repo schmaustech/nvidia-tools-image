@@ -5,14 +5,18 @@ FROM registry.access.redhat.com/ubi9/ubi:latest
 WORKDIR /root
 
 # Copy in packages not available in UBI repo
-COPY show_gids /usr/bin/show_gids
+COPY show_gids /usr/sbin/show_gids
+RUN chmod +x /usr/sbin/show_gids
 COPY ibdev2netdev /usr/sbin/ibdev2netdev
+RUN chmod +x /usr/sbin/ibdev2netdev
+COPY net-driver-mapping.sh /usr/sbin/net-driver-mapping.sh
+RUN chmod +x /usr/sbin/net-driver-mapping.sh
 
 # DNF install packages either from repo or locally
 RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
 RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmacm libxcb libxcb-devel libxkbcommon libxkbcommon-x11 pciutils-devel rdma-core-devel xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm -y
 RUN dnf install openmpi openmpi-devel openssh-server openssh-clients -y
-RUN dnf install iperf3 -y
+RUN dnf install iperf3 bc -y
 
 # Cleanup 
 RUN dnf clean all
@@ -24,9 +28,13 @@ RUN mkdir /nfsfast
 # Fix OpenMPI
 RUN ln -s /usr/include/openmpi-x86_64 /usr/lib64/openmpi/include
 
-# Run container entrypoint
+# Add container entrypoint, iperf scripts, keygens and config
 COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh
+COPY iperf_server.sh /usr/sbin/iperf_server.sh
+RUN chmod +x /usr/sbin/iperf_server.sh
+COPY iperf_client.sh /usr/sbin/iperf_client.sh
+RUN chmod +x /usr/sbin/iperf_client.sh
 COPY bashrc /root/.bashrc
 RUN ssh-keygen -A
 RUN yes y | ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa > /dev/null 
