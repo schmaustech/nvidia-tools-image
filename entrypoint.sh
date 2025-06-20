@@ -46,6 +46,7 @@ chmod +x /usr/local/bin/mlxup
 # Set working dir
 cd /root
 
+
 # Set architecture
 ARCH=`uname -m`
 
@@ -95,5 +96,10 @@ make install
 # Enable SSHD deamon on port 20024
 mkdir -p /var/run/sshd && /usr/sbin/sshd -p 20024
 
-# Sleep container indefinitly
+# Echo to logs container is ready - Sleep container indefinitly
+
+echo "-------------------------------------------------------------------"
+echo "All components for the container have been Installed!"
+echo "Testing and tool usage is Ready!"
+echo "-------------------------------------------------------------------"
 sleep infinity & wait
