@@ -1331,3 +1331,70 @@ NCCL version 2.27.3+cuda12.9
 # Avg bus bandwidth    : 4.74277 
 #
 ~~~
+
+Here is an example across 2 H200 nodes with all 8 GPUs allocated from each now.  The connectivity here though is through a single RDMA shared interface.
+
+~~~bash
+[root@nvidiatools-dgx-2d-workload ~]# mpirun --allow-run-as-root -H 192.168.6.226:1,192.168.6.225:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.6.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_0 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 all_reduce_perf -b 8 -e 16G -f2 -g 8
+Warning: Permanently added '[192.168.6.226]:20024' (ED25519) to the list of known hosts.
+# nThread 1 nGpus 8 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  0 [0000:1b:00] NVIDIA H200
+#  Rank  1 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  1 [0000:43:00] NVIDIA H200
+#  Rank  2 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  2 [0000:52:00] NVIDIA H200
+#  Rank  3 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  3 [0000:61:00] NVIDIA H200
+#  Rank  4 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  4 [0000:9d:00] NVIDIA H200
+#  Rank  5 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  5 [0000:c3:00] NVIDIA H200
+#  Rank  6 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  6 [0000:d1:00] NVIDIA H200
+#  Rank  7 Group  0 Pid   9448 on nvidiatools-dgx-2d-workload device  7 [0000:df:00] NVIDIA H200
+#  Rank  8 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  0 [0000:1b:00] NVIDIA H200
+#  Rank  9 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  1 [0000:43:00] NVIDIA H200
+#  Rank 10 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  2 [0000:52:00] NVIDIA H200
+#  Rank 11 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  3 [0000:61:00] NVIDIA H200
+#  Rank 12 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  4 [0000:9d:00] NVIDIA H200
+#  Rank 13 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  5 [0000:c3:00] NVIDIA H200
+#  Rank 14 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  6 [0000:d1:00] NVIDIA H200
+#  Rank 15 Group  0 Pid   9481 on nvidiatools-dgx-9d-workload device  7 [0000:df:00] NVIDIA H200
+NCCL version 2.27.3+cuda12.9
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)       
+           8             2     float     sum      -1    59.24    0.00    0.00      0    32.26    0.00    0.00      0
+          16             4     float     sum      -1    33.59    0.00    0.00      0    32.82    0.00    0.00      0
+          32             8     float     sum      -1    32.54    0.00    0.00      0    31.84    0.00    0.00      0
+          64            16     float     sum      -1    32.51    0.00    0.00      0    32.95    0.00    0.00      0
+         128            32     float     sum      -1    36.12    0.00    0.01      0    33.41    0.00    0.01      0
+         256            64     float     sum      -1    64.80    0.00    0.01      0    33.93    0.01    0.01      0
+         512           128     float     sum      -1    35.95    0.01    0.03      0    34.63    0.01    0.03      0
+        1024           256     float     sum      -1    35.39    0.03    0.05      0    33.82    0.03    0.06      0
+        2048           512     float     sum      -1    33.75    0.06    0.11      0    37.36    0.05    0.10      0
+        4096          1024     float     sum      -1    37.23    0.11    0.21      0    37.12    0.11    0.21      0
+        8192          2048     float     sum      -1    39.21    0.21    0.39      0    38.28    0.21    0.40      0
+       16384          4096     float     sum      -1    42.19    0.39    0.73      0    43.15    0.38    0.71      0
+       32768          8192     float     sum      -1    43.54    0.75    1.41      0    47.55    0.69    1.29      0
+       65536         16384     float     sum      -1    77.66    0.84    1.58      0    51.76    1.27    2.37      0
+      131072         32768     float     sum      -1    102.9    1.27    2.39      0    102.7    1.28    2.39      0
+      262144         65536     float     sum      -1    106.3    2.47    4.62      0    73.50    3.57    6.69      0
+      524288        131072     float     sum      -1    82.97    6.32   11.85      0    91.74    5.71   10.72      0
+     1048576        262144     float     sum      -1    100.5   10.43   19.56      0    98.94   10.60   19.87      0
+     2097152        524288     float     sum      -1    117.0   17.92   33.61      0    114.6   18.30   34.31      0
+     4194304       1048576     float     sum      -1    169.3   24.78   46.46      0    166.0   25.27   47.39      0
+     8388608       2097152     float     sum      -1    255.7   32.80   61.50      0    254.8   32.92   61.72      0
+    16777216       4194304     float     sum      -1    432.9   38.76   72.67      0    435.1   38.56   72.31      0
+    33554432       8388608     float     sum      -1    768.1   43.68   81.90      0    770.0   43.58   81.71      0
+    67108864      16777216     float     sum      -1   1475.2   45.49   85.29      0   1466.8   45.75   85.78      0
+   134217728      33554432     float     sum      -1   2816.0   47.66   89.37      0   2817.0   47.65   89.33      0
+   268435456      67108864     float     sum      -1   5541.4   48.44   90.83      0   5544.4   48.42   90.78      0
+   536870912     134217728     float     sum      -1    10999   48.81   91.52      0    10989   48.86   91.60      0
+  1073741824     268435456     float     sum      -1    21881   49.07   92.01      0    21889   49.05   91.98      0
+  2147483648     536870912     float     sum      -1    43690   49.15   92.16      0    43681   49.16   92.18      0
+  4294967296    1073741824     float     sum      -1    87334   49.18   92.21      0    87256   49.22   92.29      0
+  8589934592    2147483648     float     sum      -1   174409   49.25   92.35      0   174438   49.24   92.33      0
+ 17179869184    4294967296     float     sum      -1   348875   49.24   92.33      0   348796   49.25   92.35      0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 36.2205 
+#
+
+~~~
