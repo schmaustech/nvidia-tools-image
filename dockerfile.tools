@@ -5,10 +5,10 @@ FROM registry.access.redhat.com/ubi9/ubi:latest
 WORKDIR /root
 
 # Copy in packages not available in UBI repo
-COPY show_gids /usr/sbin/show_gids
-RUN chmod +x /usr/sbin/show_gids
-COPY ibdev2netdev /usr/sbin/ibdev2netdev
-RUN chmod +x /usr/sbin/ibdev2netdev
+#COPY show_gids /usr/sbin/show_gids
+#RUN chmod +x /usr/sbin/show_gids
+#COPY ibdev2netdev /usr/sbin/ibdev2netdev
+#RUN chmod +x /usr/sbin/ibdev2netdev
 COPY net-driver-mapping.sh /usr/sbin/net-driver-mapping.sh
 RUN chmod +x /usr/sbin/net-driver-mapping.sh
 
