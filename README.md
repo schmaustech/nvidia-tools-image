@@ -70,8 +70,8 @@ FROM registry.access.redhat.com/ubi9/ubi:latest
 WORKDIR /root
 
 # Copy in packages not available in UBI repo
-COPY show_gids /usr/bin/show_gids
-COPY ibdev2netdev /usr/sbin/ibdev2netdev
+#COPY show_gids /usr/bin/show_gids
+#COPY ibdev2netdev /usr/sbin/ibdev2netdev
 
 # DNF install packages either from repo or locally
 RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
