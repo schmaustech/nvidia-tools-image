@@ -364,7 +364,7 @@ spec:
         claimName: pvc-netapp-phy-test
   containers:
     - name: nvidiatools-30-workload
-      image: quay.io/redhat_emp1/ecosys-nvidia/nvidia-tools:0.0.3
+      image: quay.io/edge-infrastructure/nvidia-tools:0.1.5
       imagePullPolicy: IfNotPresent
       securityContext:
         privileged: true
