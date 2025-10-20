@@ -1229,7 +1229,7 @@ n_gids_found=4
 Now we can actually do our mpirun across the two worker nodes.  
 
 ~~~bash
-[root@nvidiatools-29-workload nccl-tests]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_1,mlx5_3 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 ./build/all_reduce_perf -b 8 -e 16G -f2 -g 1
+[root@nvidiatools-29-workload nccl-tests]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_1,mlx5_3 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 -x NCCL_ALGO=ring ./build/all_reduce_perf -b 8 -e 16G -f2 -g 1
 # nThread 1 nGpus 1 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
@@ -1281,7 +1281,7 @@ NCCL version 2.27.3+cuda12.9
 This second run is just like the first except we have allocated 2 GPUs per pods instead of just 1 as in the first test run.
 
 ~~~bash
-[root@nvidiatools-29-workload ~]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=0 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_2,mlx5_8 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 all_reduce_perf -b 8 -e 16G -f2 -g 2
+[root@nvidiatools-29-workload ~]# mpirun --allow-run-as-root -H 192.168.10.1:1,192.168.10.2:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.10.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=0 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_2,mlx5_8 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 -x NCCL_ALGO=ring all_reduce_perf -b 8 -e 16G -f2 -g 2
 # nThread 1 nGpus 2 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
@@ -1335,7 +1335,7 @@ NCCL version 2.27.3+cuda12.9
 Here is an example across 2 H200 nodes with all 8 GPUs allocated from each now.  The connectivity here though is through a single RDMA shared interface.
 
 ~~~bash
-[root@nvidiatools-dgx-2d-workload ~]# mpirun --allow-run-as-root -H 192.168.6.226:1,192.168.6.225:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.6.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_0 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 all_reduce_perf -b 8 -e 16G -f2 -g 8
+[root@nvidiatools-dgx-2d-workload ~]# mpirun --allow-run-as-root -H 192.168.6.226:1,192.168.6.225:1 -np 2 -bind-to none -map-by slot -mca pml ob1 -mca btl ^openib -mca btl_tcp_if_include 192.168.6.0/24 -mca plm_rsh_args "-p 20024" -x NCCL_IB_DISABLE=1 -x NCCL_DEBUG=VERSION -x NCCL_SOCKET_IFNAME=net1 -x NCCL_IB_HCA=mlx5_0 -x UCX_NET_DEVICES=net1 -x NCCL_NET_GDR_READ=1 -x NCCL_ALGO=ring all_reduce_perf -b 8 -e 16G -f2 -g 8
 Warning: Permanently added '[192.168.6.226]:20024' (ED25519) to the list of known hosts.
 # nThread 1 nGpus 8 minBytes 8 maxBytes 17179869184 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
 #
