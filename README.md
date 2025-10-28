@@ -92,7 +92,7 @@ RUN ln -s /usr/include/openmpi-x86_64 /usr/lib64/openmpi/include
 # Run container entrypoint
 COPY entrypoint.sh /root/entrypoint.sh
 RUN chmod +x /root/entrypoint.sh
-COPY bashrc /root/.bashrc
+COPY .bashrc /root/.bashrc
 RUN ssh-keygen -A
 RUN yes y | ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa > /dev/null 
 RUN cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
