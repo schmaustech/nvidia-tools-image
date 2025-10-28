@@ -211,6 +211,7 @@ echo "All components for the container have been Installed!"
 echo "Testing and tool usage is Ready!"
 echo "-------------------------------------------------------------------"
 sleep infinity & wait
+EOF
 ~~~
 
 Now that we have our dockerfile and entrypoint script we can build the image.
