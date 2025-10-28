@@ -215,9 +215,10 @@ sleep infinity & wait
 EOF
 ~~~
 
-Finally let's build a .bashrc file for our pathing.
+Finally let's build a .bashrc file for our pathing and an ssh config.
 
 ~~~bash
+$ cat <<EOF > .bashrc
 # .bashrc
 
 # Source global definitions
@@ -241,6 +242,17 @@ export LD_LIBRARY_PATH=/usr/lib:/usr/lib64:/usr/local/lib:/usr/local/lib:/usr/li
 alias rm='rm -i'
 alias cp='cp -i'
 alias mv='mv -i'
+EOF
+~~~
+
+And the ssh config
+
+~~~bash
+$ cat <<EOF > config
+Host *
+   StrictHostKeyChecking no
+   UserKnownHostsFile=/dev/null
+EOF
 ~~~
 
 Now that we have our dockerfile, entrypoint script and .bashrc we can build the image.
