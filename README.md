@@ -100,6 +100,7 @@ RUN chmod 600 /root/.ssh/authorized_keys
 COPY config /root/.ssh/config
 
 ENTRYPOINT ["/root/entrypoint.sh"]
+EOF
 ~~~
 
 One of the scripts that will get copied into the container when the dockerfile is run is the `entrypoint.sh` script.
