@@ -492,10 +492,166 @@ Configurations:                                          Next Boot
         LINK_TYPE_P1                                ETH(2) 
 ~~~
 
+We can also take the `mlxconfig` command and use it to set values of the devices.  In this example we use a bash one-liner to get a list of all the devices that have roce_rail in the name and then set their NUM_OF_VFS to 1.  Note that we also pass the `-y` flag so that for each device we automatically answer yes for confirmation.
+
+~~~bash
+$ for device in `mst status -v|grep roce_rail|awk {'print $3'}`; do mlxconfig -y -d $device set NUM_OF_VFS=1; done
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             cc:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             ba:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             3a:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             5d:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             ca:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             db:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             18:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             1a:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             9b:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+
+Device #1:
+----------
+
+Device type:        BlueField3          
+Name:               900-9D3D4-00EN-HA0_Ax
+Description:        Nvidia BlueField-3 B3140H E-series HHHL SuperNIC; 400GbE (default mode) / NDR IB; Single-port QSFP112; PCIe Gen5.0 x16; 8 Arm cores; 16GB on board DDR; integrated BMC; Crypto Enabled
+Device:             4d:00.0             
+
+Configurations:                                          Next Boot       New
+        NUM_OF_VFS                                  16                   1                   
+
+ Apply new Configuration? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+~~~
+
 Another tool in the container is `flint` which allows us to see the firmware, product version and PSID for the device.  This is useful for preparing for a firmware update.
 
 ~~~bash
-flint -d 37:00.0 query
+$ flint -d 37:00.0 query
 Image type:            FS4
 FW Version:            28.43.1014
 FW Release Date:       7.11.2024
