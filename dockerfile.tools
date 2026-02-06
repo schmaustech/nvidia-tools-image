@@ -16,7 +16,7 @@ RUN chmod +x /usr/sbin/net-driver-mapping.sh
 RUN dnf install wget procps-ng pciutils yum jq iputils ethtool net-tools kmod systemd-udev rpm-build gcc make git autoconf automake libtool -y
 RUN dnf install fio usbutils infiniband-diags libglvnd-opengl libibumad librdmacm libxcb libxcb-devel libxkbcommon libxkbcommon-x11 pciutils-devel rdma-core-devel xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm -y
 RUN dnf install openmpi openmpi-devel openssh-server openssh-clients -y
-RUN dnf install iperf3 bc -y
+RUN dnf install iperf3 bc hwloc -y
 
 # Cleanup 
 RUN dnf clean all
