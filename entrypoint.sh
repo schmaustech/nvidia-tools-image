@@ -4,8 +4,8 @@ cd /root
 
 # Set tool versions 
 MLNXTOOLVER=23.07-1.el9
-MFTTOOLVER=4.30.0-139
-MLXUPVER=4.30.0
+MFTTOOLVER=4.34.1-10
+MLXUPVER=4.34.0
 
 # Set architecture
 ARCH=`uname -m`
@@ -53,7 +53,7 @@ ARCH=`uname -m`
 # Configure and install cuda-toolkit
 dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$ARCH/cuda-rhel9.repo
 dnf clean all
-dnf -y install cuda-toolkit-12-8
+dnf -y install cuda-toolkit-13-1
 dnf -y install libnccl-static libnccl-devel libnccl
 
 # Export CUDA library paths
